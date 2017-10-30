@@ -238,7 +238,17 @@ def safecall(iscalled, **kwargs):
     for name in called_signature.parameters:
         param = called_signature.parameters[name]
         if param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-            accepted_args.append(args_to_inspect.pop(name))
+            try:
+                arg = args_to_inspect.pop(name)
+            except KeyError as exc:
+                recname = iscalled.__name__
+                raise TypeError(
+                        "The receiver '%s' expects " % recname +
+                        "the argument '%s', " % name +
+                        "but it was not sent.\n%s: %s" % (recname, iscalled)
+                        ) from exc
+            accepted_args.append(arg)
+        # TODO: check if the following parameter kinds can actually be used
         elif param.kind == inspect.Parameter.KEYWORD_ONLY:
             accepted_kwargs[name] = args_to_inspect.pop(name)
         elif param.kind == inspect.Parameter.VAR_KEYWORD:
