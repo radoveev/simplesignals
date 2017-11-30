@@ -352,7 +352,7 @@ def autoconnect_signals(receiver, prefix="on__", senders=None, channels=None):
             channellist = channeldata  # multiple channels
         else:
             channellist = [channeldata]  # single channel
-        # connect receiver to channel
+        # connect the receiver to all senders on this channel
         for channel in channellist:
             connect(method, signal=signal, sender=Any, channel=channel)
         # if neither channel nor sender were specified,
