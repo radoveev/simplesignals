@@ -77,7 +77,8 @@ class ConnectionMap(object):
         else:
             receivers = sendermap.get(sender, [])
         # remove receiver
-        receivers = [r for r in receivers if r is not receiver]
+        recid = safeid(receiver)
+        receivers = [r for r in receivers if safeid(r) != recid]
         self.connections[signal][sender] = receivers
         # if we disconnect from any signal, we need to look at all signals
         if signal is Any:
@@ -326,6 +327,17 @@ def safecall(iscalled, **kwargs):
                                       str(param.kind) + " is not supported." +
                                       " Use keyword parameters instead.")
     iscalled(*accepted_args, **accepted_kwargs)
+
+
+def safeid(iscalled):
+    """Return an id that is the same for the same callable.
+
+    This is necessary because the id of methods change if they are
+    bound to a new name.
+    """
+    if hasattr(iscalled, "__func__"):
+        return id(iscalled.__func__)
+    return id(iscalled)
 
 
 def add_signals(*signallist):
