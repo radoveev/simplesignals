@@ -55,14 +55,39 @@ class ConnectionMap(object):
         if signal not in self.connections:
             self.connections[signal] = {}
         sendermap = self.connections[signal]
-        # get map of receivers for this sender
+        # get list of receivers for this sender
         if sender not in sendermap:
             sendermap[sender] = []
         receivers = sendermap[sender]
         # add new receiver to sender
         receivers.append(receiver)
-         #TODO the next line might be unneccessary
+        # TODO the next line might be unneccessary
         self.connections[signal][sender] = receivers
+
+    def disconnect(self, receiver, signal, sender, strict=True):
+        log.info("Disconnect %s from '%s' from %s", receiver, signal, sender)
+        # get map of senders for this signal
+        if strict is True:
+            sendermap = self.connections[signal]
+        else:
+            sendermap = self.connections.get(signal, {})
+        # get list of receivers for this sender
+        if strict is True:
+            receivers = sendermap[sender]
+        else:
+            receivers = sendermap.get(sender, [])
+        # remove receiver
+        receivers = [r for r in receivers if r is not receiver]
+        self.connections[signal][sender] = receivers
+        # if we disconnect from any signal, we need to look at all signals
+        if signal is Any:
+            for si in signals:
+                self.disconnect(receiver, si, sender, strict=False)
+        # if we disconnect from any sender, we need to look at all senders
+        if sender is Any:
+            sendermap = self.connections[signal]
+            for se in sendermap:
+                self.disconnect(receiver, signal, se, strict=False)
 
     def get_receivers(self, signal, sender):
         # signals from anonymous senders are sent
@@ -131,6 +156,20 @@ class Connections(object):
             self.connmap.connect(receiver, signal, sender)
         else:
             self.connmap.connect(receiver, signal, channel)
+
+    def disconnect(self, receiver, signal=Any, sender=Any, channel=None):
+        """This function disconnects a receiver from a signal.
+
+        For a description of valid arguments for this method, read the
+        docstring of the disconnect function in this package.
+        """
+        if sender is None:
+            raise ValueError("Cannot disconnect from anonymous " +
+                             "signals explicitly.")
+        if channel is None:
+            self.connmap.disconnect(receiver, signal, sender)
+        else:
+            self.connmap.disconnect(receiver, signal, channel)
 
     def send(self, signal, sender=Anonymous, channel=None, **kwargs):
         """This function sends a signal safely.
@@ -201,6 +240,34 @@ def connect(receiver, signal=Any, sender=Any, channel=None):
     if channel is not None and channel not in channels:
         log.warning("Connecting unknown channel '%s' on %s", channel, receiver)
     connections.connect(receiver, signal, sender, channel)
+
+
+def disconnect(receiver, signal=Any, sender=Any, channel=None):
+    """This function connects a receiver to a signal.
+
+    If a channel is given, the sender argument is ignored.
+
+    If signal is Any the receiver is disconnected from all signals for the
+    specified sender or channel.
+    If sender is Any the receiver is disconnected from all senders for the
+    specified signal. The channel argument must be None.
+    If channel is Any the receiver is disconnected from all channels for the
+    specified signal. The sender argument is ignored.
+    """
+    global connections
+    if channel is not None and sender is not Any:
+        log.warning("Disconnecting %s via '%s' from channel '%s'; " +
+                    "The specified sender %s was ignored.",
+                    receiver, signal, channel, sender)
+    # warn about unknown signal, but disconnect it anyway
+    if signal not in signals:
+        log.warning("Disconnecting unknown signal '%s' on %s",
+                    signal, receiver)
+    # warn about unknown channel, but disconnect it anyway
+    if channel is not None and channel not in channels:
+        log.warning("Disconnecting unknown channel '%s' on %s",
+                    channel, receiver)
+    connections.disconnect(receiver, signal, sender, channel)
 
 
 def send(signal, sender=Anonymous, channel=None, **kwargs):
